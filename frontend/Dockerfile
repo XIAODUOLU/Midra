@@ -1,5 +1,6 @@
 FROM node:20-alpine AS build
 WORKDIR /app
+RUN npm config set registry https://registry.npmmirror.com
 COPY frontend/package.json /app/package.json
 RUN npm install
 COPY frontend /app

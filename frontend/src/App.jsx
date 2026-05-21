@@ -93,6 +93,11 @@ export function App() {
       <header className="card">
         <h1>Midra</h1>
         <p className="hero-subtitle">Agentic prompt-to-MIDI composition for editable, controllable music workflows.</p>
+        <p>
+          <a href="https://github.com/XIAODUOLU/Midra" target="_blank" rel="noreferrer">
+            GitHub Repository
+          </a>
+        </p>
       </header>
 
       <section className="card">
