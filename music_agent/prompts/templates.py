@@ -13,6 +13,22 @@ def _load_instrument_knowledge() -> str:
         return ""
 
 
+def _load_chord_knowledge() -> str:
+    knowledge_path = Path(__file__).resolve().parent.parent / "knowledges" / "chords.md"
+    try:
+        return knowledge_path.read_text(encoding="utf-8").strip()
+    except Exception:
+        return ""
+
+
+def _load_note_knowledge() -> str:
+    knowledge_path = Path(__file__).resolve().parent.parent / "knowledges" / "notes.md"
+    try:
+        return knowledge_path.read_text(encoding="utf-8").strip()
+    except Exception:
+        return ""
+
+
 def build_intent_parser_prompt(user_prompt: str, enforce_core_tracks: bool = True) -> str:
     track_rule = (
         "- requested_tracks must include at least drums,bass,chords,lead."
@@ -64,11 +80,15 @@ Rules:
 
 
 def build_song_planner_prompt(intent: dict) -> str:
+    chord_knowledge = _load_chord_knowledge()
     return f"""
 You are a Song Planner for a MIDI music generation pipeline.
 Return JSON only. No markdown, no explanations.
 
 Input intent: {intent}
+
+Chord progression knowledge:
+{chord_knowledge}
 
 Output top-level key: song_plan
 Required song_plan fields:
@@ -88,6 +108,13 @@ Constraints:
   - NOT allowed: slash chords (e.g. Eb/G), extensions (maj7, m7, sus4, add9), altered chords
   - Chord roots must come from this map: {NOTE_TO_SEMITONE}
   - Canonical note names used by the system: {SEMITONE_TO_NOTE}
+- Use the chord progression knowledge above as the primary decision guide:
+  - infer major/minor mode from intent style, mood, and use_case
+  - choose a chord-degree template that matches the requested style and emotion
+  - convert roman-numeral degrees into concrete chord symbols in the selected key
+  - keep chord_progression section-aware and loopable
+  - if the knowledge suggests unsupported chords, adapt them to parser-compatible major/minor triads
+- chord_progression must contain concrete chord symbols only, not roman numerals.
 - Output must follow this exact JSON shape:
 {{
   "song_plan": {{
@@ -168,12 +195,16 @@ def build_track_note_generator_prompt(song_plan: dict, arrangement_track: dict) 
     total_beats = total_bars * beats_per_bar
     track_id = arrangement_track.get("id", "unknown")
     role = arrangement_track.get("role", "unknown")
+    note_knowledge = _load_note_knowledge()
     return f"""
 You are a MIDI note event generator.
 Return JSON only. No markdown, no explanations.
 
 Input song_plan: {song_plan}
 Input track: {arrangement_track}
+
+Note generation knowledge:
+{note_knowledge}
 
 Output format (exact):
 {{
@@ -190,6 +221,12 @@ Constraints:
 - total_beats: {total_beats}
 - Keep style coherence with song_plan and track.style.
 - Generate fresh musical content for this run.
+- Use the note generation knowledge above as the primary decision guide:
+  - derive note choices from the active chord at each beat/bar
+  - choose register, duration, density, velocity, and rhythm according to track role, instrument, style, and section energy
+  - keep bass, chords, pad, lead, arpeggio, drums, strings, brass, guitar, piano, ethnic instruments, and FX behavior role-appropriate
+  - avoid all tracks using the same rhythmic density or all tracks playing full chords
+  - make loop endings lead naturally back to the beginning when song_plan.loopable is true
 - Respect harmonic compatibility with current chord parser:
   - Chord symbols in song_plan are major/minor triads only
   - Do not invent slash chords or extended symbols in any output text
