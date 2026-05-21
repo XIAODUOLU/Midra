@@ -10,6 +10,7 @@ def validate_midi_ir(
     midi_ir: MidiIR,
     selected_tracks: list[str] | None = None,
     out_of_bounds_mode: str = "drop",
+    enforce_core_tracks: bool = True,
 ) -> dict:
     errors: list[str] = []
     warnings: list[dict] = []
@@ -27,18 +28,17 @@ def validate_midi_ir(
     if ts.get("numerator", 0) <= 0 or ts.get("denominator", 0) <= 0:
         errors.append("Invalid time signature")
 
-    if selected_tracks is None:
+    if selected_tracks is None and enforce_core_tracks:
         for c in CORE_TRACKS:
             if c not in track_map:
                 errors.append(f"Missing core track: {c}")
             elif len(track_map[c].events) == 0:
                 errors.append(f"Core track is empty: {c}")
     else:
-        if len(selected_tracks) == 0:
-            errors.append("selected_tracks cannot be empty")
-        for tid in selected_tracks:
-            if tid not in track_map:
-                errors.append(f"Selected track does not exist or is disabled: {tid}")
+        if not selected_tracks is None:
+            for tid in selected_tracks:
+                if tid not in track_map:
+                    errors.append(f"Selected track does not exist or is disabled: {tid}")
 
     total_beats = float(midi_ir.meta.get("total_beats", 0))
     dropped_out_of_bounds_events = 0

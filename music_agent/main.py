@@ -67,7 +67,7 @@ def generate_music(
     if resume and intent_path.exists():
         intent = _load_stage(intent_path)
     else:
-        intent = parse_intent(user_prompt)
+        intent = parse_intent(user_prompt, enforce_core_tracks=(note_generation_mode != "llm"))
         _save_stage(intent_path, intent)
     t1 = time.perf_counter()
     print(f"[Stage] intent: done in {t1 - t0:.3f}s")
@@ -87,7 +87,7 @@ def generate_music(
     if resume and arrangement_path.exists():
         arrangement = _load_stage(arrangement_path)
     else:
-        arrangement = plan_arrangement(intent, song_plan)
+        arrangement = plan_arrangement(intent, song_plan, enforce_core_tracks=(note_generation_mode != "llm"))
         _save_stage(arrangement_path, arrangement)
     t1 = time.perf_counter()
     print(f"[Stage] arrangement: done in {t1 - t0:.3f}s")
@@ -142,6 +142,7 @@ def generate_music(
         midi_ir,
         selected_tracks=selected_tracks,
         out_of_bounds_mode=out_of_bounds_mode,
+        enforce_core_tracks=(note_generation_mode != "llm"),
     )
     if not validation["passed"]:
         return {

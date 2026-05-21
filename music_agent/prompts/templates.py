@@ -1,9 +1,24 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from music_agent.core.music_theory import NOTE_TO_SEMITONE, SEMITONE_TO_NOTE
 
 
-def build_intent_parser_prompt(user_prompt: str) -> str:
+def _load_instrument_knowledge() -> str:
+    knowledge_path = Path(__file__).resolve().parent.parent / "knowledges" / "instruments.md"
+    try:
+        return knowledge_path.read_text(encoding="utf-8").strip()
+    except Exception:
+        return ""
+
+
+def build_intent_parser_prompt(user_prompt: str, enforce_core_tracks: bool = True) -> str:
+    track_rule = (
+        "- requested_tracks must include at least drums,bass,chords,lead."
+        if enforce_core_tracks
+        else "- requested_tracks should be decided by musical intent; do not force fixed instrument sets."
+    )
     return f"""
 You are an Intent Parser for a MIDI music generation pipeline.
 Return JSON only. No markdown, no explanations.
@@ -43,7 +58,7 @@ Rules:
   }}
 }}
 - Never output keys like "intent.style" or "intent.mood".
-- requested_tracks must include at least drums,bass,chords,lead.
+{track_rule}
 - Fill missing values with reasonable defaults.
 """.strip()
 
@@ -91,8 +106,20 @@ Constraints:
 """.strip()
 
 
-def build_arrangement_planner_prompt(intent: dict, song_plan: dict) -> str:
-    return f"""
+def build_arrangement_planner_prompt(
+    intent: dict,
+    song_plan: dict,
+    enforce_core_tracks: bool = True,
+) -> str:
+    arrangement_track_rule = (
+        "- tracks must include core tracks: drums,bass,chords,lead"
+        if enforce_core_tracks
+        else "- tracks should be decided by style and user intent; do not force fixed core instruments"
+    )
+    instrument_knowledge = _load_instrument_knowledge()
+    return f"""Instrument knowledge:
+{instrument_knowledge}
+
 You are an Arrangement Planner for a MIDI music generation pipeline.
 Return JSON only. No markdown, no explanations.
 
@@ -103,7 +130,7 @@ Output format:
 {{"arrangement": {{"tracks": {{...}} }} }}
 
 Rules:
-- tracks must include core tracks: drums,bass,chords,lead
+{arrangement_track_rule}
 - extra tracks are allowed when needed by style or user request
 - drums must use channel=9 and program=null
 - non-drum tracks must not use channel=9
