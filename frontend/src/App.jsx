@@ -6,7 +6,16 @@ function getClientId() {
   const key = "midra_client_id";
   const existing = localStorage.getItem(key);
   if (existing) return existing;
-  const id = crypto.randomUUID();
+
+  const safeRandomId = () => {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+    const rand = Math.random().toString(16).slice(2);
+    return `midra-${Date.now()}-${rand}`;
+  };
+
+  const id = safeRandomId();
   localStorage.setItem(key, id);
   return id;
 }
