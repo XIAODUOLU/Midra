@@ -4,8 +4,16 @@ from music_agent.agents.llm_client import llm_json
 from music_agent.prompts import build_intent_parser_prompt
 
 
-def parse_intent(user_prompt: str, enforce_core_tracks: bool = True) -> dict:
-    prompt = build_intent_parser_prompt(user_prompt, enforce_core_tracks=enforce_core_tracks)
+def parse_intent(
+    user_prompt: str,
+    enforce_core_tracks: bool = True,
+    max_duration_seconds: int | None = None,
+) -> dict:
+    prompt = build_intent_parser_prompt(
+        user_prompt,
+        enforce_core_tracks=enforce_core_tracks,
+        max_duration_seconds=max_duration_seconds,
+    )
     data = llm_json(prompt)
     if "intent" not in data or not isinstance(data["intent"], dict):
         raise ValueError("Invalid intent JSON shape: missing nested 'intent' object")

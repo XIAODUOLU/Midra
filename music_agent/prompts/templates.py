@@ -29,11 +29,20 @@ def _load_note_knowledge() -> str:
         return ""
 
 
-def build_intent_parser_prompt(user_prompt: str, enforce_core_tracks: bool = True) -> str:
+def build_intent_parser_prompt(
+    user_prompt: str,
+    enforce_core_tracks: bool = True,
+    max_duration_seconds: int | None = None,
+) -> str:
     track_rule = (
         "- requested_tracks must include at least drums,bass,chords,lead."
         if enforce_core_tracks
         else "- requested_tracks should be decided by musical intent; do not force fixed instrument sets."
+    )
+    duration_rule = (
+        f"- intent.duration_seconds must be <= {max_duration_seconds}. If user asks longer, clamp to {max_duration_seconds}."
+        if max_duration_seconds is not None
+        else "- intent.duration_seconds should be reasonable for loopable BGM and default to 30 when unclear."
     )
     return f"""
 You are an Intent Parser for a MIDI music generation pipeline.
@@ -75,6 +84,7 @@ Rules:
 }}
 - Never output keys like "intent.style" or "intent.mood".
 {track_rule}
+- {duration_rule}
 - Fill missing values with reasonable defaults.
 """.strip()
 

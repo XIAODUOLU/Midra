@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 import traceback
 import uuid
@@ -64,10 +65,23 @@ def generate_music(
 
     t0 = time.perf_counter()
     print("[Stage] intent: start")
+    max_duration_seconds: int | None = None
+    max_duration_raw = os.getenv("MAX_MUSIC_DURATION_SECONDS", "").strip()
+    if max_duration_raw:
+        try:
+            parsed = int(max_duration_raw)
+            if parsed > 0:
+                max_duration_seconds = parsed
+        except ValueError:
+            max_duration_seconds = None
     if resume and intent_path.exists():
         intent = _load_stage(intent_path)
     else:
-        intent = parse_intent(user_prompt, enforce_core_tracks=(note_generation_mode != "llm"))
+        intent = parse_intent(
+            user_prompt,
+            enforce_core_tracks=(note_generation_mode != "llm"),
+            max_duration_seconds=max_duration_seconds,
+        )
         _save_stage(intent_path, intent)
     t1 = time.perf_counter()
     print(f"[Stage] intent: done in {t1 - t0:.3f}s")
