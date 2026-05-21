@@ -57,6 +57,7 @@ Midra 提供的是 code-first 编曲范式：
 sudo apt install ffmpeg
 sudo apt install fluidsynth fluid-soundfont-gm
 pip install -r requirements.txt
+pip install -e .
 ```
 
 ### 2）配置环境变量
@@ -71,16 +72,56 @@ cp .env.example .env
 - `OPENAI_BASE_URL`
 - `OPENAI_MODEL`
 
-### 3）运行
+可选项：
+
+- `MAX_MUSIC_DURATION_SECONDS`
+
+### 3）Docker 启动（前后端一体）
+
+#### 必要配置
+
+1. 在 [`backend/config.yaml`](backend/config.yaml) 中配置后端运行参数。
+2. 通过 shell 环境变量（或 Docker Compose 读取的 `.env`）提供 OpenAI 凭证：
 
 ```bash
-python main.py "generate a 30 seconds cyberpunk boss battle bgm with drums bass chords and lead" --project-name demo --project-id test001
+export OPENAI_API_KEY="your_key"
+export OPENAI_BASE_URL="https://api.openai.com/v1"
+export OPENAI_MODEL="gpt-5.5"
 ```
 
-### 4）断点续运行
+3. 确保挂载目录存在：
 
 ```bash
-python main.py "generate a 30 seconds cyberpunk boss battle bgm with drums bass chords and lead" --project-name demo --project-id test001 --resume
+mkdir -p backend/data outputs
+```
+
+#### 一键启动
+
+```bash
+docker compose up --build -d
+```
+
+#### 访问地址
+
+- 前端：`http://localhost:5173`
+- 后端 API：`http://localhost:8000`
+
+#### 停止
+
+```bash
+docker compose down
+```
+
+### 4）运行（CLI）
+
+```bash
+midra "generate a 30 seconds cyberpunk boss battle bgm with drums bass chords and lead" --project-name demo --project-id test001
+```
+
+### 5）断点续运行（CLI）
+
+```bash
+midra "generate a 30 seconds cyberpunk boss battle bgm with drums bass chords and lead" --project-name demo --project-id test001 --resume
 ```
 
 ## 输出目录

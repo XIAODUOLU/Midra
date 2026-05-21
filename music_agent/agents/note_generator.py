@@ -5,6 +5,7 @@ import random
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from typing import Callable
 
 from music_agent.agents.llm_client import llm_json
 from music_agent.prompts import build_track_note_generator_prompt
@@ -57,6 +58,7 @@ def generate_notes(
     arrangement: dict,
     note_generation_mode: str = "llm",
     checkpoint_path: str | None = None,
+    progress_callback: Callable[[dict], None] | None = None,
 ) -> dict:
     enabled_tracks = [
         (track_id, track)
@@ -113,9 +115,29 @@ def generate_notes(
             executor.submit(_generate_one_track, track_id, track): track_id
             for track_id, track in enabled_tracks
         }
+        if progress_callback:
+            progress_callback(
+                {
+                    "type": "track_progress",
+                    "track_total": len(enabled_tracks),
+                    "track_completed": 0,
+                    "current_track_id": None,
+                }
+            )
+        completed = 0
         for future in as_completed(future_to_track_id):
             track_id = future_to_track_id[future]
             results_by_track[track_id] = future.result()
+            completed += 1
+            if progress_callback:
+                progress_callback(
+                    {
+                        "type": "track_progress",
+                        "track_total": len(enabled_tracks),
+                        "track_completed": completed,
+                        "current_track_id": track_id,
+                    }
+                )
 
     out = [results_by_track[track_id] for track_id, _ in enabled_tracks]
     if checkpoint_path:

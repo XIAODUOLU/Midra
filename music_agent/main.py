@@ -7,6 +7,7 @@ import time
 import traceback
 import uuid
 from pathlib import Path
+from typing import Callable
 
 from music_agent.agents.arrangement_planner import plan_arrangement
 from music_agent.agents.intent_parser import parse_intent
@@ -48,6 +49,7 @@ def generate_music(
     mp3_bitrate: str = "192k",
     note_generation_mode: str = "llm",
     out_of_bounds_mode: str = "drop",
+    progress_callback: Callable[[dict], None] | None = None,
 ) -> dict:
     pid = project_id or uuid.uuid4().hex[:8]
     pdir = _project_dir(pid, project_name)
@@ -63,7 +65,24 @@ def generate_music(
     if output_path is None:
         output_path = str(pdir / "generated.mid")
 
+    stage_total = 9
+
+    def _emit_stage(stage_index: int, stage_name: str, status: str, extra: dict | None = None) -> None:
+        if not progress_callback:
+            return
+        payload = {
+            "type": "stage",
+            "stage_index": stage_index,
+            "stage_total": stage_total,
+            "stage_name": stage_name,
+            "status": status,
+        }
+        if extra:
+            payload.update(extra)
+        progress_callback(payload)
+
     t0 = time.perf_counter()
+    _emit_stage(1, "intent", "start")
     print("[Stage] intent: start")
     max_duration_seconds: int | None = None
     max_duration_raw = os.getenv("MAX_MUSIC_DURATION_SECONDS", "").strip()
@@ -84,9 +103,11 @@ def generate_music(
         )
         _save_stage(intent_path, intent)
     t1 = time.perf_counter()
+    _emit_stage(1, "intent", "done", {"elapsed_seconds": round(t1 - t0, 3)})
     print(f"[Stage] intent: done in {t1 - t0:.3f}s")
 
     t0 = time.perf_counter()
+    _emit_stage(2, "song_plan", "start")
     print("[Stage] song_plan: start")
     if resume and song_plan_path.exists():
         song_plan = _load_stage(song_plan_path)
@@ -94,9 +115,11 @@ def generate_music(
         song_plan = plan_song(intent)
         _save_stage(song_plan_path, song_plan)
     t1 = time.perf_counter()
+    _emit_stage(2, "song_plan", "done", {"elapsed_seconds": round(t1 - t0, 3)})
     print(f"[Stage] song_plan: done in {t1 - t0:.3f}s")
 
     t0 = time.perf_counter()
+    _emit_stage(3, "arrangement", "start")
     print("[Stage] arrangement: start")
     if resume and arrangement_path.exists():
         arrangement = _load_stage(arrangement_path)
@@ -104,9 +127,11 @@ def generate_music(
         arrangement = plan_arrangement(intent, song_plan, enforce_core_tracks=(note_generation_mode != "llm"))
         _save_stage(arrangement_path, arrangement)
     t1 = time.perf_counter()
+    _emit_stage(3, "arrangement", "done", {"elapsed_seconds": round(t1 - t0, 3)})
     print(f"[Stage] arrangement: done in {t1 - t0:.3f}s")
 
     t0 = time.perf_counter()
+    _emit_stage(4, "track_events", "start")
     print("[Stage] track_events: start")
     if resume and track_events_path.exists():
         track_events = _load_stage(track_events_path)
@@ -116,12 +141,15 @@ def generate_music(
             arrangement,
             note_generation_mode=note_generation_mode,
             checkpoint_path=str(track_events_path),
+            progress_callback=progress_callback,
         )
         _save_stage(track_events_path, track_events)
     t1 = time.perf_counter()
+    _emit_stage(4, "track_events", "done", {"elapsed_seconds": round(t1 - t0, 3)})
     print(f"[Stage] track_events: done in {t1 - t0:.3f}s")
 
     t0 = time.perf_counter()
+    _emit_stage(5, "midi_ir", "start")
     print("[Stage] midi_ir: start")
     if resume and midi_ir_path.exists():
         midi_ir_dict = _load_stage(midi_ir_path)
@@ -148,9 +176,11 @@ def generate_music(
         midi_ir = assemble_midi_ir(song_plan, arrangement, track_events["track_events"])
         _save_stage(midi_ir_path, to_dict(midi_ir))
     t1 = time.perf_counter()
+    _emit_stage(5, "midi_ir", "done", {"elapsed_seconds": round(t1 - t0, 3)})
     print(f"[Stage] midi_ir: done in {t1 - t0:.3f}s")
 
     t0 = time.perf_counter()
+    _emit_stage(6, "validation", "start")
     print("[Stage] validation: start")
     validation = validate_midi_ir(
         midi_ir,
@@ -159,6 +189,7 @@ def generate_music(
         enforce_core_tracks=(note_generation_mode != "llm"),
     )
     if not validation["passed"]:
+        _emit_stage(6, "validation", "failed", {"errors": validation.get("errors", [])})
         return {
             "success": False,
             "error": {
@@ -169,18 +200,22 @@ def generate_music(
             "validation": validation,
         }
     t1 = time.perf_counter()
+    _emit_stage(6, "validation", "done", {"elapsed_seconds": round(t1 - t0, 3)})
     print(f"[Stage] validation: done in {t1 - t0:.3f}s")
 
     t0 = time.perf_counter()
+    _emit_stage(7, "midi_render", "start")
     print("[Stage] midi_render: start")
     render_result = render_midi(midi_ir, output_path=output_path, selected_tracks=selected_tracks)
     t1 = time.perf_counter()
+    _emit_stage(7, "midi_render", "done", {"elapsed_seconds": round(t1 - t0, 3)})
     print(f"[Stage] midi_render: done in {t1 - t0:.3f}s")
 
     wav_path = str(Path(render_result["output_path"]).with_suffix(".wav"))
     mp3_path = str(Path(render_result["output_path"]).with_suffix(".mp3"))
 
     t0 = time.perf_counter()
+    _emit_stage(8, "wav_render", "start")
     print("[Stage] wav_render: start")
     if resume and wav_stage_path.exists():
         wav_result = _load_stage(wav_stage_path)
@@ -195,9 +230,11 @@ def generate_music(
         }
         _save_stage(wav_stage_path, wav_result)
     t1 = time.perf_counter()
+    _emit_stage(8, "wav_render", "done", {"elapsed_seconds": round(t1 - t0, 3)})
     print(f"[Stage] wav_render: done in {t1 - t0:.3f}s")
 
     t0 = time.perf_counter()
+    _emit_stage(9, "mp3_render", "start")
     print("[Stage] mp3_render: start")
     if resume and mp3_stage_path.exists():
         mp3_result = _load_stage(mp3_stage_path)
@@ -211,6 +248,7 @@ def generate_music(
         }
         _save_stage(mp3_stage_path, mp3_result)
     t1 = time.perf_counter()
+    _emit_stage(9, "mp3_render", "done", {"elapsed_seconds": round(t1 - t0, 3)})
     print(f"[Stage] mp3_render: done in {t1 - t0:.3f}s")
 
     final_output = {

@@ -1,0 +1,27 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: midra-backend
+    expose:
+      - "8000"
+    volumes:
+      - ./backend/config.yaml:/app/backend/config.yaml
+      - ./backend/data:/app/backend/data
+      - ./sf2:/app/sf2
+      - ./outputs:/app/outputs
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-}
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: midra-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend

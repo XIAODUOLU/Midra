@@ -1,0 +1,25 @@
+app:
+  host: 0.0.0.0
+  port: 8000
+  cors_origins:
+    - "*"
+
+runtime:
+  data_dir: "backend/data"
+  outputs_dir: "outputs/projects"
+  stage_retry_count: 3
+  daily_task_limit: 100
+  max_music_duration_seconds: 120
+  global_single_active_task: true
+
+music_defaults:
+  project_name_prefix: "web"
+  soundfont_path: "/usr/share/sounds/sf2/FluidR3_GM.sf2"
+  mp3_bitrate: "192k"
+  note_mode: "llm"
+  out_of_bounds_mode: "ignore"
+
+llm:
+  openai_api_key: ""
+  openai_base_url: "https://api.openai.com/v1"
+  openai_model: "gpt-5.5"

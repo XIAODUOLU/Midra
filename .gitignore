@@ -224,4 +224,7 @@ docs/
 outputs/
 
 # SourceFonts
-SF2/
+sf2/
+
+# Data
+backend/data/

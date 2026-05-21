@@ -1,0 +1,6 @@
+backend/data/
+outputs/
+sf2/
+.git/
+__pycache__/
+*.pyc
